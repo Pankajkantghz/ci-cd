@@ -1,4 +1,4 @@
-name: Deploy to staging
+name: Deploy (Main)
 
 on:
   push:
@@ -6,29 +6,29 @@ on:
       - "main"
 
 jobs:
-  redeploy_everything:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 🚀 Start Pipeline
-        run: echo "CI/CD Started"
-
-      - name: 🔐 Setup SSH & Deploy
+      - name: Deploy via SSH
         run: |
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > key.pem
           chmod 600 key.pem
 
           ssh -o StrictHostKeyChecking=no -i key.pem dev@20.197.45.185 << 'EOF'
 
-            echo "🚀 Connected to server"
+            echo "🚀 Deployment Started"
 
             cd ~/ci-cd || exit
 
-            echo "📥 Updating latest code"
+            echo "🧹 Cleaning old build"
+            rm -rf apps/web/.next
+
+            echo "📥 Updating code"
             git fetch origin
             git reset --hard origin/main
 
-            echo "📦 Installing pnpm if not exists"
+            echo "📦 Install pnpm if missing"
             if ! command -v pnpm &> /dev/null
             then
               npm install -g pnpm
@@ -40,20 +40,28 @@ jobs:
             echo "🏗️ Building project"
             pnpm run build
 
-            echo "♻️ Restarting services"
+            echo "🛑 Stopping old processes"
+            pm2 delete fe-server || true
+            pm2 delete http-server || true
+            pm2 delete ws-server || true
 
-            cd apps/web && pm2 restart fe-server || pm2 start npm --name "fe-server" -- start
+            echo "🚀 Starting fresh processes"
 
-            cd ../http-server && pm2 restart http-server || pm2 start npm --name "http-server" -- start
+            cd apps/web
+            pm2 start npm --name "fe-server" -- start
 
-            cd ../ws-server && pm2 restart ws-server || pm2 start npm --name "ws-server" -- start
+            cd ../http-server
+            pm2 start npm --name "http-server" -- start
 
-            echo "💾 Saving PM2 state"
+            cd ../ws-server
+            pm2 start npm --name "ws-server" -- start
+
+            echo "💾 Saving PM2"
             pm2 save
 
-            echo "✅ Deployment successful at $(date)"
+            echo "📊 PM2 Status"
+            pm2 list
+
+            echo "✅ Deployment Done"
 
           EOF
-
-      - name: 🎉 End Pipeline
-        run: echo "CI/CD Finished"
