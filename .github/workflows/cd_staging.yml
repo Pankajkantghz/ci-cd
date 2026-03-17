@@ -21,9 +21,6 @@ jobs:
 
             cd ~/ci-cd || exit
 
-            echo "🧹 Cleaning old build"
-            rm -rf apps/web/.next
-
             echo "📥 Updating code"
             git fetch origin
             git reset --hard origin/main
@@ -37,23 +34,24 @@ jobs:
             echo "📦 Installing dependencies"
             pnpm install
 
-            echo "🏗️ Building project"
+            echo "🧹 Cleaning old frontend build"
+            rm -rf apps/web/.next
+
+            echo "🏗️ Building frontend (IMPORTANT)"
+            cd apps/web
             pnpm run build
 
-            echo "🛑 Stopping old processes"
+            echo "♻️ Restarting frontend (clean)"
             pm2 delete fe-server || true
-            pm2 delete http-server || true
-            pm2 delete ws-server || true
-
-            echo "🚀 Starting fresh processes"
-
-            cd apps/web
             pm2 start npm --name "fe-server" -- start
 
+            echo "🔁 Restart backend services"
             cd ../http-server
+            pm2 delete http-server || true
             pm2 start npm --name "http-server" -- start
 
             cd ../ws-server
+            pm2 delete ws-server || true
             pm2 start npm --name "ws-server" -- start
 
             echo "💾 Saving PM2"
