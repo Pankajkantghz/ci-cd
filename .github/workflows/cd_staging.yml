@@ -1,32 +1,59 @@
-- name: Deploy via SSH
-  run: |
-    echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > key.pem
-    chmod 600 key.pem
+name: Deploy to staging
 
-    ssh -o StrictHostKeyChecking=no -i key.pem dev@20.197.45.185 << 'EOF'
+on:
+  push:
+    branches:
+      - "main"
 
-      echo "🚀 Connected"
+jobs:
+  redeploy_everything:
+    runs-on: ubuntu-latest
 
-      cd ~/ci-cd || exit
+    steps:
+      - name: 🚀 Start Pipeline
+        run: echo "CI/CD Started"
 
-      echo "📥 Updating code"
-      git fetch origin
-      git reset --hard origin/main
+      - name: 🔐 Setup SSH & Deploy
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > key.pem
+          chmod 600 key.pem
 
-      echo "📦 Installing deps"
-      pnpm install
+          ssh -o StrictHostKeyChecking=no -i key.pem dev@20.197.45.185 << 'EOF'
 
-      echo "🏗️ Build"
-      pnpm run build
+            echo "🚀 Connected to server"
 
-      echo "♻️ Restarting services"
+            cd ~/ci-cd || exit
 
-      cd apps/web && pm2 restart fe-server
+            echo "📥 Updating latest code"
+            git fetch origin
+            git reset --hard origin/main
 
-      cd ../http-server && pm2 restart http-server
+            echo "📦 Installing pnpm if not exists"
+            if ! command -v pnpm &> /dev/null
+            then
+              npm install -g pnpm
+            fi
 
-      cd ../ws-server && pm2 restart ws-server
+            echo "📦 Installing dependencies"
+            pnpm install
 
-      echo "✅ Deployment Done"
+            echo "🏗️ Building project"
+            pnpm run build
 
-    EOF
+            echo "♻️ Restarting services"
+
+            cd apps/web && pm2 restart fe-server || pm2 start npm --name "fe-server" -- start
+
+            cd ../http-server && pm2 restart http-server || pm2 start npm --name "http-server" -- start
+
+            cd ../ws-server && pm2 restart ws-server || pm2 start npm --name "ws-server" -- start
+
+            echo "💾 Saving PM2 state"
+            pm2 save
+
+            echo "✅ Deployment successful at $(date)"
+
+          EOF
+
+      - name: 🎉 End Pipeline
+        run: echo "CI/CD Finished"
