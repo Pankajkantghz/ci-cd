@@ -1,34 +1,32 @@
-name: Deploy to staging
+- name: Deploy via SSH
+  run: |
+    echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > key.pem
+    chmod 600 key.pem
 
-on:
-  push:
-    branches:
-      - "main"
+    ssh -o StrictHostKeyChecking=no -i key.pem dev@20.197.45.185 << 'EOF'
 
-jobs:
-  redeploy_everything:
-    runs-on: ubuntu-latest
+      echo "🚀 Connected"
 
-    steps:
-      - name: Deploy via SSH
-        run: |
-          printf "%s" "${{ secrets.SSH_PRIVATE_KEY }}" > key.pem
-          chmod 600 key.pem
+      cd ~/ci-cd || exit
 
-          ssh -o StrictHostKeyChecking=no -i key.pem dev@20.197.45.185 << 'EOF'
-            cd ~/ci-cd || exit
+      echo "📥 Updating code"
+      git fetch origin
+      git reset --hard origin/main
 
-            git pull origin main
+      echo "📦 Installing deps"
+      pnpm install
 
-            if ! command -v pnpm &> /dev/null
-            then
-              npm install -g pnpm
-            fi
+      echo "🏗️ Build"
+      pnpm run build
 
-            pnpm install
-            pnpm run build
+      echo "♻️ Restarting services"
 
-            pm2 restart fe-server || pm2 start npm --name "fe-server" -- start
-            pm2 restart http-server || pm2 start dist/index.js --name "http-server"
-            pm2 restart ws-server || pm2 start dist/index.js --name "ws-server"
-          EOF
+      cd apps/web && pm2 restart fe-server
+
+      cd ../http-server && pm2 restart http-server
+
+      cd ../ws-server && pm2 restart ws-server
+
+      echo "✅ Deployment Done"
+
+    EOF
