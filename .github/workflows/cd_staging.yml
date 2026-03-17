@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Deploy via SSH
         run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > key.pem
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > key.pem
           chmod 600 key.pem
 
           ssh -o StrictHostKeyChecking=no -i key.pem dev@20.197.45.185 << 'EOF'
