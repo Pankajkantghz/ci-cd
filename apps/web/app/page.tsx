@@ -7,9 +7,9 @@ export default async function Home() {
 
   return (
     <div>
-      <h1>name</h1>
+      <h1>Name</h1>
       {user?.username}
-       <h1>password</h1>
+       <h1>Password</h1>
       {user?.password}
       <br />
       <div>
