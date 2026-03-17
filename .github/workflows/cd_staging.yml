@@ -1,0 +1,35 @@
+name: Deploy to staging
+
+on:
+  push:
+    branches:
+      - "main"
+
+jobs:
+  redeploy_everything:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > key.pem
+          chmod 600 key.pem
+
+          ssh -o StrictHostKeyChecking=no -i key.pem dev@20.197.45.185 << 'EOF'
+            cd ~/ci-cd || exit
+
+            git pull origin main
+
+            # Install pnpm if not installed
+            if ! command -v pnpm &> /dev/null
+            then
+              npm install -g pnpm
+            fi
+
+            pnpm install
+            pnpm run build
+
+            pm2 restart fe-server || pm2 start npm --name "fe-server" -- start
+            pm2 restart http-server || pm2 start dist/index.js --name "http-server"
+            pm2 restart ws-server || pm2 start dist/index.js --name "ws-server"
+          EOF
