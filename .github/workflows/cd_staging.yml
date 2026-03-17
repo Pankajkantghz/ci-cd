@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Deploy via SSH
         run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > key.pem
+          printf "%s" "${{ secrets.SSH_PRIVATE_KEY }}" > key.pem
           chmod 600 key.pem
 
           ssh -o StrictHostKeyChecking=no -i key.pem dev@20.197.45.185 << 'EOF'
@@ -20,7 +20,6 @@ jobs:
 
             git pull origin main
 
-            # Install pnpm if not installed
             if ! command -v pnpm &> /dev/null
             then
               npm install -g pnpm
