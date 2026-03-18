@@ -21,6 +21,11 @@ jobs:
 
             cd ~/ci-cd || exit
 
+            # ✅ LOAD NODE (VERY IMPORTANT)
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            nvm use --lts
+
             echo "📥 Updating code"
             git fetch origin
             git reset --hard origin/main
@@ -37,22 +42,20 @@ jobs:
             echo "🧹 Cleaning old frontend build"
             rm -rf apps/web/.next
 
-            echo "🏗️ Building frontend (IMPORTANT)"
+            echo "🏗️ Building frontend"
             cd apps/web
             pnpm run build
 
-            echo "♻️ Restarting frontend (clean)"
+            echo "♻️ Restart frontend"
             pm2 delete fe-server || true
             pm2 start npm --name "fe-server" -- start
 
-            echo "🔁 Restart backend services"
+            echo "🔁 Restart backend"
             cd ../http-server
-            pm2 delete http-server || true
-            pm2 start npm --name "http-server" -- start
+            pm2 restart http-server || pm2 start npm --name "http-server" -- start
 
             cd ../ws-server
-            pm2 delete ws-server || true
-            pm2 start npm --name "ws-server" -- start
+            pm2 restart ws-server || pm2 start npm --name "ws-server" -- start
 
             echo "💾 Saving PM2"
             pm2 save
